@@ -1,6 +1,11 @@
 name: brew bump
 
 on:
+  # eval-exec/neomacs dispatches neomacs_release_published_v1 as soon as a
+  # stable release is published; the schedule is the reconciliation path for
+  # a missed dispatch.
+  repository_dispatch:
+    types: [neomacs_release_published_v1]
   workflow_dispatch:
   schedule:
     # Randomized off-peak slot; bump the cask when a new neomacs release lands.
