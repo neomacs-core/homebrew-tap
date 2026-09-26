@@ -34,35 +34,24 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Homebrew rejects cask paths outside a tap, so tap the checked-out
-      # revision itself; every later step uses the fully qualified token and
-      # therefore audits this revision.  setup-homebrew has already tapped
-      # the GitHub repository, and `brew tap` refuses a second tap with a
-      # different remote, so drop it first.
-      - name: Tap the checked-out revision
-        id: tap
-        run: |
-          repo="${GITHUB_REPOSITORY#*/}"
-          tap="${GITHUB_REPOSITORY_OWNER}/${repo#homebrew-}"
-          echo "name=${tap}" >> "${GITHUB_OUTPUT}"
-          brew untap "${tap}" 2>/dev/null || true
-          brew tap "${tap}" "$PWD"
-
+      # setup-homebrew symlinks the tap path to this checkout (and its post
+      # step reverses that), so the fully qualified token below audits this
+      # revision; Homebrew rejects bare cask paths outside a tap.
       - name: Style
-        run: brew style --cask "${{ steps.tap.outputs.name }}/neomacs"
+        run: brew style --cask neomacs-core/tap/neomacs
 
       - name: Audit
-        run: brew audit --cask --strict --online "${{ steps.tap.outputs.name }}/neomacs"
+        run: brew audit --cask --strict --online neomacs-core/tap/neomacs
 
       - name: Livecheck
-        run: brew livecheck --cask "${{ steps.tap.outputs.name }}/neomacs"
+        run: brew livecheck --cask neomacs-core/tap/neomacs
 
       - name: Fetch (verify checksum)
-        run: brew fetch --cask --retry --force "${{ steps.tap.outputs.name }}/neomacs"
+        run: brew fetch --cask --retry --force neomacs-core/tap/neomacs
         timeout-minutes: 30
 
       - name: Install
-        run: brew install --cask "${{ steps.tap.outputs.name }}/neomacs"
+        run: brew install --cask neomacs-core/tap/neomacs
         timeout-minutes: 30
 
       - name: Uninstall
