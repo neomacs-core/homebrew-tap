@@ -34,21 +34,32 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Homebrew rejects cask paths outside a tap, so tap the checked-out
+      # repository itself; every later step uses the fully qualified token
+      # and therefore audits the content of this revision.
+      - name: Tap the checked-out repository
+        id: tap
+        run: |
+          repo="${GITHUB_REPOSITORY#*/}"
+          tap="${GITHUB_REPOSITORY_OWNER}/${repo#homebrew-}"
+          echo "name=${tap}" >> "${GITHUB_OUTPUT}"
+          brew tap --force "${tap}" "$PWD"
+
       - name: Style
-        run: brew style --cask Casks/neomacs.rb
+        run: brew style --cask "${{ steps.tap.outputs.name }}/neomacs"
 
       - name: Audit
-        run: brew audit --cask --strict --online Casks/neomacs.rb
+        run: brew audit --cask --strict --online "${{ steps.tap.outputs.name }}/neomacs"
 
       - name: Livecheck
-        run: brew livecheck --cask Casks/neomacs.rb
+        run: brew livecheck --cask "${{ steps.tap.outputs.name }}/neomacs"
 
       - name: Fetch (verify checksum)
-        run: brew fetch --cask --retry --force Casks/neomacs.rb
+        run: brew fetch --cask --retry --force "${{ steps.tap.outputs.name }}/neomacs"
         timeout-minutes: 30
 
       - name: Install
-        run: brew install --cask Casks/neomacs.rb
+        run: brew install --cask "${{ steps.tap.outputs.name }}/neomacs"
         timeout-minutes: 30
 
       - name: Uninstall
