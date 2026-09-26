@@ -35,15 +35,18 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # Homebrew rejects cask paths outside a tap, so tap the checked-out
-      # repository itself; every later step uses the fully qualified token
-      # and therefore audits the content of this revision.
-      - name: Tap the checked-out repository
+      # revision itself; every later step uses the fully qualified token and
+      # therefore audits this revision.  setup-homebrew has already tapped
+      # the GitHub repository, and `brew tap` refuses a second tap with a
+      # different remote, so drop it first.
+      - name: Tap the checked-out revision
         id: tap
         run: |
           repo="${GITHUB_REPOSITORY#*/}"
           tap="${GITHUB_REPOSITORY_OWNER}/${repo#homebrew-}"
           echo "name=${tap}" >> "${GITHUB_OUTPUT}"
-          brew tap --force "${tap}" "$PWD"
+          brew untap "${tap}" 2>/dev/null || true
+          brew tap "${tap}" "$PWD"
 
       - name: Style
         run: brew style --cask "${{ steps.tap.outputs.name }}/neomacs"
