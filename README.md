@@ -23,10 +23,11 @@ Or trust the cask first and then use the short name:
 
 ## Release verification
 
-Current releases are ad-hoc signed (Apple Developer ID notarization is not
-configured yet). Homebrew-installed builds launch without extra steps; a DMG
-downloaded through a browser may require *System Settings → Privacy &
-Security → Open Anyway* on first launch.
+Current releases are ad-hoc signed and notarization is not configured yet, so
+macOS Gatekeeper blocks the first launch of every downloaded copy — including
+Homebrew's, which sets the quarantine attribute. Approve *Neomacs* once in
+*System Settings → Privacy & Security → Open Anyway*; the block disappears
+entirely once releases are notarized.
 
 ## Cask maintenance
 
