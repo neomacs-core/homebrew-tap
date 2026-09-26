@@ -1,0 +1,52 @@
+name: brew audit
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash -xeuo pipefail {0}
+
+jobs:
+  cask:
+    runs-on: macos-26
+    env:
+      HOMEBREW_GITHUB_API_TOKEN: ${{ github.token }}
+    steps:
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@848c272c7bfe984a197bd4d16383f4c106ec61e6 # 2026.09.21.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check out the tap
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Style
+        run: brew style --cask Casks/neomacs.rb
+
+      - name: Audit
+        run: brew audit --cask --strict --online Casks/neomacs.rb
+
+      - name: Livecheck
+        run: brew livecheck --cask Casks/neomacs.rb
+
+      - name: Fetch (verify checksum)
+        run: brew fetch --cask --retry --force Casks/neomacs.rb
+        timeout-minutes: 30
+
+      - name: Install
+        run: brew install --cask Casks/neomacs.rb
+        timeout-minutes: 30
+
+      - name: Uninstall
+        run: brew uninstall --cask neomacs
+        timeout-minutes: 10
