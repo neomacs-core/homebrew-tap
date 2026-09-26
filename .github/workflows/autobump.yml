@@ -8,8 +8,11 @@ on:
     types: [neomacs_release_published_v1]
   workflow_dispatch:
   schedule:
-    # Randomized off-peak slot; bump the cask when a new neomacs release lands.
-    - cron: "23 5 * * *"
+    # Ten-minute reconciliation for a missed dispatch.  A bump run only reads
+    # the release API (livecheck plus the asset digests) and opens a pull
+    # request when a new version exists, so a frequent timer stays cheap.
+    # The minutes avoid GitHub's top-of-the-hour scheduling congestion.
+    - cron: "5,15,25,35,45,55 * * * *"
 
 permissions: {}
 
@@ -32,7 +35,30 @@ jobs:
         id: git_setup
         uses: Homebrew/actions/git-user-config@848c272c7bfe984a197bd4d16383f4c106ec61e6 # 2026.09.21.1
 
+      # At a ten-minute cadence a bump pull request may still be open when the
+      # next run fires; bumping again would open a duplicate.  Skip only while
+      # a pull request for the current latest version exists, so a newer
+      # release still bumps immediately.
+      - name: Find the latest neomacs release version
+        id: latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="$(gh api repos/eval-exec/neomacs/releases/latest --jq '.tag_name' | sed 's/^v//')"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check for an open pull request for that version
+        id: open_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.latest.outputs.version }}
+        run: |
+          count="$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open \
+            --search "${VERSION} in:title" --json number --jq 'length')"
+          echo "count=${count}" >> "${GITHUB_OUTPUT}"
+
       - name: Bump cask
+        if: steps.open_pr.outputs.count == '0'
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_GIT_COMMITTER_NAME: ${{ steps.git_setup.outputs.name }}
