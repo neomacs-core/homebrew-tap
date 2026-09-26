@@ -8,11 +8,12 @@ on:
     types: [neomacs_release_published_v1]
   workflow_dispatch:
   schedule:
-    # Ten-minute reconciliation for a missed dispatch.  A bump run only reads
-    # the release API (livecheck plus the asset digests) and opens a pull
-    # request when a new version exists, so a frequent timer stays cheap.
-    # The minutes avoid GitHub's top-of-the-hour scheduling congestion.
-    - cron: "5,15,25,35,45,55 * * * *"
+    # Five-minute reconciliation for a missed dispatch -- GitHub's minimum
+    # schedule interval.  A bump run only reads the release API (livecheck
+    # plus the asset digests) and opens a pull request when a new version
+    # exists, so a frequent timer stays cheap.  The step starts at minute 2
+    # to skip GitHub's congested top-of-the-hour slot.
+    - cron: "2-59/5 * * * *"
 
 permissions: {}
 
