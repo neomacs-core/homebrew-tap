@@ -20,15 +20,19 @@ jobs:
     env:
       HOMEBREW_GITHUB_API_TOKEN: ${{ github.token }}
     steps:
-      - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@848c272c7bfe984a197bd4d16383f4c106ec61e6 # 2026.09.21.1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
+      # Check out before Homebrew setup: setup-homebrew configures git
+      # credentials, and actions/checkout then sends its own Authorization
+      # header as well, which GitHub rejects with
+      # `remote: Duplicate header: "Authorization"` (HTTP 400).
       - name: Check out the tap
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@848c272c7bfe984a197bd4d16383f4c106ec61e6 # 2026.09.21.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Style
         run: brew style --cask Casks/neomacs.rb
