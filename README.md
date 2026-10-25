@@ -31,8 +31,8 @@ entirely once releases are notarized.
 
 ## Cask maintenance
 
-`.github/workflows/autobump.yml` runs `brew bump --casks` against
-[`eval-exec/neomacs`](https://github.com/eval-exec/neomacs) releases and opens
-a pull request when a new version is published. `.github/workflows/tests.yml`
-styles, audits, checksums, livechecks, installs, and uninstalls the cask on
-every change.
+`.github/workflows/autobump.yml` runs `brew livecheck` against
+[`eval-exec/neomacs`](https://github.com/eval-exec/neomacs) releases and
+commits a `brew bump-cask-pr` update straight to `main` when a new version is
+published. `.github/workflows/tests.yml` styles, audits, checksums,
+livechecks, installs, and uninstalls the cask on every change.

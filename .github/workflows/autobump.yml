@@ -9,17 +9,17 @@ on:
   workflow_dispatch:
   schedule:
     # Five-minute reconciliation for a missed dispatch -- GitHub's minimum
-    # schedule interval.  A bump run only reads the release API (livecheck
-    # plus the asset digests) and opens a pull request when a new version
-    # exists, so a frequent timer stays cheap.  The step starts at minute 2
-    # to skip GitHub's congested top-of-the-hour slot.
+    # schedule interval.  A tick only runs livecheck against the release API
+    # and commits when a newer version exists, so a frequent timer stays
+    # cheap.  The step starts at minute 2 to skip GitHub's congested
+    # top-of-the-hour slot.
     - cron: "2-59/5 * * * *"
 
 permissions: {}
 
 # macOS runners start slower than Linux ones, so a run can still be in flight
 # when the next five-minute tick fires.  Queue the tick instead of cancelling a
-# bump midway; by the time it starts, the open-PR guard below will skip it.
+# bump midway; by the time it starts, the livecheck below will skip it.
 concurrency:
   group: autobump
   cancel-in-progress: false
@@ -30,51 +30,53 @@ defaults:
 
 jobs:
   autobump:
-    # `brew bump --open-pr` runs `brew bump-cask-pr`, which audits the bumped
-    # cask before opening the PR.  Auditing a cask downloads and mounts its
-    # artifacts with `hdiutil`, so the job needs macOS; on Linux `brew audit`
-    # dies with `hdiutil: No such file or directory` and no PR is opened.
-    # This mirrors Homebrew's own autobump workflow (macos-26).
+    # Cask bumps are audited on macOS: `brew audit` downloads and mounts the
+    # DMG artifacts with `hdiutil`, which does not exist on Linux.  This
+    # mirrors Homebrew's own autobump workflow (macos-26).
     runs-on: macos-26
     permissions:
       contents: write
-      pull-requests: write
     steps:
       - name: Set up Homebrew
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@e99025eb970cfa124b8284a35463d87426917478 # 2026.09.28.1
+        with:
+          # Configure git's Authorization header so the bump step can push.
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up git
         id: git_setup
         uses: Homebrew/actions/git-user-config@e99025eb970cfa124b8284a35463d87426917478 # 2026.09.28.1
 
-      # At a five-minute cadence a bump pull request may still be open when the
-      # next run fires; bumping again would open a duplicate.  Skip only while
-      # a pull request for the current latest version exists, so a newer
-      # release still bumps immediately.
-      - name: Find the latest neomacs release version
-        id: latest
+      # setup-homebrew checks out the commit that triggered the run.  A queued
+      # scheduled run may have been created before the previous run pushed its
+      # bump, so fast-forward to the current main before checking the version.
+      - name: Update the tap to the latest main
+        run: git pull --ff-only origin main
+
+      # livecheck uses the cask's own `github_latest` strategy and only emits
+      # a version when the cask is outdated, so an equal or newer cask version
+      # (say, after a manual bump) never triggers a re-bump or a downgrade.
+      - name: Check for a newer release
+        id: livecheck
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          version="$(gh api repos/eval-exec/neomacs/releases/latest --jq '.tag_name' | sed 's/^v//')"
+          version="$(brew livecheck --cask --json --newer-only \
+            neomacs-core/tap/neomacs | jq -r '.[0].version.latest // empty')"
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
-      - name: Check for an open pull request for that version
-        id: open_pr
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.latest.outputs.version }}
-        run: |
-          count="$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open \
-            --search "${VERSION} in:title" --json number --jq 'length')"
-          echo "count=${count}" >> "${GITHUB_OUTPUT}"
-
+      # Commit straight to main rather than opening a pull request: the
+      # organization does not allow GitHub Actions to create pull requests,
+      # and tests.yml re-audits the cask on the resulting push.
       - name: Bump cask
-        if: steps.open_pr.outputs.count == '0'
+        if: steps.livecheck.outputs.version != ''
         env:
+          VERSION: ${{ steps.livecheck.outputs.version }}
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_GIT_COMMITTER_NAME: ${{ steps.git_setup.outputs.name }}
           HOMEBREW_GIT_COMMITTER_EMAIL: ${{ steps.git_setup.outputs.email }}
-          TAP_NAME: ${{ steps.set-up-homebrew.outputs.tap-name }}
-        run: brew bump --no-fork --open-pr --casks --tap="$TAP_NAME"
+        run: |
+          brew bump-cask-pr neomacs-core/tap/neomacs \
+            --version="${VERSION}" --write-only --commit
+          git push origin HEAD:main
