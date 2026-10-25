@@ -1,9 +1,9 @@
 cask "neomacs" do
   arch arm: "aarch64", intel: "x86_64"
 
-  version "0.0.19"
-  sha256 arm:   "33ed07e4eebd1cd4ec4df5689fc6930b2029f2cfb545cc1ded496266197eec8a",
-         intel: "b2f616c2f1a9cd6d0c90fe1889a70066746f4cd7f5171dad4a54c319ddb942a4"
+  version "0.0.20"
+  sha256 arm:   "e2d1b366eaae147428444e380296b5b6a9298411fe19685668896002e31449e9",
+         intel: "39fe343b3155f4b87ec3d897d044b0fba35c97793d654585fd179d1da08ead5f"
 
   url "https://github.com/eval-exec/neomacs/releases/download/v#{version}/neomacs-#{version}-#{arch}-apple-darwin.dmg"
   name "Neomacs"
