@@ -17,13 +17,25 @@ on:
 
 permissions: {}
 
+# macOS runners start slower than Linux ones, so a run can still be in flight
+# when the next five-minute tick fires.  Queue the tick instead of cancelling a
+# bump midway; by the time it starts, the open-PR guard below will skip it.
+concurrency:
+  group: autobump
+  cancel-in-progress: false
+
 defaults:
   run:
     shell: bash -xeuo pipefail {0}
 
 jobs:
   autobump:
-    runs-on: ubuntu-latest
+    # `brew bump --open-pr` runs `brew bump-cask-pr`, which audits the bumped
+    # cask before opening the PR.  Auditing a cask downloads and mounts its
+    # artifacts with `hdiutil`, so the job needs macOS; on Linux `brew audit`
+    # dies with `hdiutil: No such file or directory` and no PR is opened.
+    # This mirrors Homebrew's own autobump workflow (macos-26).
+    runs-on: macos-26
     permissions:
       contents: write
       pull-requests: write
@@ -36,7 +48,7 @@ jobs:
         id: git_setup
         uses: Homebrew/actions/git-user-config@e99025eb970cfa124b8284a35463d87426917478 # 2026.09.28.1
 
-      # At a ten-minute cadence a bump pull request may still be open when the
+      # At a five-minute cadence a bump pull request may still be open when the
       # next run fires; bumping again would open a duplicate.  Skip only while
       # a pull request for the current latest version exists, so a newer
       # release still bumps immediately.
