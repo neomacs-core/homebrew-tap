@@ -36,6 +36,7 @@ jobs:
     runs-on: macos-26
     permissions:
       contents: write
+      actions: write
     steps:
       - name: Set up Homebrew
         id: set-up-homebrew
@@ -67,8 +68,9 @@ jobs:
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
       # Commit straight to main rather than opening a pull request: the
-      # organization does not allow GitHub Actions to create pull requests,
-      # and tests.yml re-audits the cask on the resulting push.
+      # organization does not allow GitHub Actions to create pull requests.
+      # `bump-cask-pr` still audits the bumped cask (including mounting the
+      # DMGs) before it commits.
       - name: Bump cask
         if: steps.livecheck.outputs.version != ''
         env:
@@ -80,3 +82,11 @@ jobs:
           brew bump-cask-pr neomacs-core/tap/neomacs \
             --version="${VERSION}" --write-only --commit
           git push origin HEAD:main
+
+      # Pushes made with GITHUB_TOKEN do not trigger other workflows, so kick
+      # off tests.yml explicitly to install and uninstall the bumped cask.
+      - name: Test the bumped cask
+        if: steps.livecheck.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run tests.yml --repo "${GITHUB_REPOSITORY}" --ref main
